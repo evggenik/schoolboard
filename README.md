@@ -48,7 +48,24 @@ React, TypeScript, tldraw + @tldraw/sync, Node.js, WebSocket, SQLite
 
 ## Installation
 
-Coming soon.
+Requirements: Node.js 20.19+ and npm.
+
+```bash
+git clone https://github.com/evggenik/schoolboard.git
+cd schoolboard
+npm install
+npm install --prefix server
+cp .env.example .env
+```
+
+Run the server and the frontend in two terminals:
+
+```bash
+npm run server
+npm run dev
+```
+
+Production deployment (nginx + systemd) is not documented yet.
 
 ## License
 

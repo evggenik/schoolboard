@@ -8,7 +8,6 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
 dist-ssr
 *.local
 
@@ -25,9 +24,9 @@ dist-ssr
 
 server/node_modules/
 data/
-.env*
-!.env.example
+
 SQLCommands.txt
+
 # Logs
 logs
 *.log
