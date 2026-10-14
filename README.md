@@ -55,15 +55,16 @@ git clone https://github.com/evggenik/schoolboard.git
 cd schoolboard
 npm install
 npm install --prefix server
-cp .env.example .env
 ```
 
 Run the server and the frontend in two terminals:
 
 ```bash
-npm run server
+CREATE_CODE=test npm run server
 npm run dev
 ```
+
+`CREATE_CODE` is the secret phrase needed to create a new board; use any word you like. The server is configured through environment variables, see `.env.example`.
 
 Production deployment (nginx + systemd) is not documented yet.
 
