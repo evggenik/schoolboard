@@ -2,13 +2,13 @@
 Simple self-hosted online whiteboard for small schools: students join by name, no registration. Built with React and tldraw.
 
 <p align="center">
-<img width="318" height="297" alt="Screenshot from 2026-10-10 21-59-56" src="https://github.com/user-attachments/assets/d7566484-67ce-4829-b2b3-685b3c56d195" width="48%"/>
-<img width="432" height="297" alt="Screenshot from 2026-10-10 22-00-09" src="https://github.com/user-attachments/assets/4a865159-1ba6-46ac-b57d-4ddabbba9623" width="48%"/>
+<img  alt="Screenshot from 2026-10-24 22-10-32" src="https://github.com/user-attachments/assets/34b551ce-83bf-4ca5-8c26-a2e68ddf8c17" width="49%"/>
+<img alt="Screenshot from 2026-10-24 22-10-38" src="https://github.com/user-attachments/assets/5bdcc7b6-a4cc-4a56-b7d8-cdc9e410abc4" width="49%"/>
 </p>
 
-<img width="865" height="363" alt="Screenshot from 2026-10-10 22-07-26" src="https://github.com/user-attachments/assets/1b7f9c37-18c2-43ae-b95e-ded3df898151" />
+<img width="842" height="282" alt="Screenshot from 2026-10-24 22-14-28" src="https://github.com/user-attachments/assets/144dc61a-a99b-4975-9a19-110ee84f7c7e" />
 
-<img width="1849" height="884" alt="Screenshot from 2026-10-10 22-04-29" src="https://github.com/user-attachments/assets/4449df44-afd3-47f5-83bc-14df85d3554b" />
+<img width="1851" height="902" alt="Screenshot from 2026-10-24 22-13-33" src="https://github.com/user-attachments/assets/8ecf0bc2-412b-47c2-9e1e-0166ddcaa8b1" />
 
 ## Why I built this
 
