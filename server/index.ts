@@ -255,6 +255,8 @@ function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {
 
 const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 
+const normName = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
+
 async function handle(req: IncomingMessage, res: ServerResponse) {
   const path = new URL(req.url ?? "/", "http://localhost").pathname;
   const cookies = parseCookies(req.headers.cookie);
@@ -349,11 +351,29 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     // Ученик входит по имени
     if (req.method === "POST" && m[2] === "join") {
       const body = await readJson(req);
-      const name = text(body.name);
+      const name = text(body.name).replace(/\s+/g, " "); // лишние пробелы внутри схлопываем
       const remember = body.remember === true;
-      if (!name || name.length > 50) {
-        return sendJson(res, 400, { error: "Введите имя (до 50 символов)" });
+      if (!name || name.length > 20) {
+        return sendJson(res, 400, { error: "Введите имя (до 20 символов)" });
       }
+
+      const wanted = normName(name);
+
+      // Имя учителя занято всегда, даже если он сейчас не в сети
+      const owner = q.userById.get(board.owner_id) as User | undefined;
+      if (owner && normName(owner.name) === wanted) {
+        return sendJson(res, 409, { error: "Это имя занято, выберите другое" });
+      }
+
+      // Имя того, кто сейчас на доске (записи тех, кто не в сети, не мешают)
+      const rows = q.participantsOfBoard.all(board.id) as Participant[];
+      if (rows.some((p) => sockets.has(p.id) && normName(p.name) === wanted)) {
+        return sendJson(res, 409, {
+          error:
+            "Такое имя уже есть на доске. Добавьте, например, первую букву фамилии",
+        });
+      }
+
       const token = newToken();
       q.insertParticipant.run(
         randomBytes(8).toString("hex"),
