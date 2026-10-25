@@ -77,7 +77,11 @@ const css = `
 .sp-btn.sp-exit:hover { background: rgba(224, 49, 49, .16); color: #e03131; }
 .sp-btn.sp-present[aria-pressed="true"] { background: #0c8599; animation: sp-pulse 1.8s ease-out infinite; --c: #0c8599; }
 
+.sp-btn.sp-back { background: rgba(240, 140, 0, .18); color: #c2410c; }
+.sp-btn.sp-back:hover { background: rgba(240, 140, 0, .3); }
 .sp-live { margin: 8px 2px 0; font-weight: 600; color: #0c8599; }
+.sp-tag { flex: none; margin-left: auto; display: inline-flex; align-items: center; color: #2f9e44; }
+.sp-tag.sp-lag { padding: 1px 7px; border-radius: 999px; font-size: 11px; font-weight: 700; color: #c2410c; background: rgba(240, 140, 0, .18); }
 .sp-debug { margin: 8px 0 0; padding: 6px; border-radius: 8px; max-height: 200px; overflow: auto; user-select: text;
   font: 10px/1.3 ui-monospace, monospace; white-space: pre-wrap; word-break: break-all;
   background: var(--color-muted-2, rgba(128, 128, 128, .14)); }
@@ -170,6 +174,19 @@ const MinimizeIcon = () => (
   </svg>
 );
 
+const CheckIcon = () => (
+  <svg {...iconProps}>
+    <path d="m5 12 5 5L20 7" />
+  </svg>
+);
+
+const RewindIcon = () => (
+  <svg {...iconProps}>
+    <path d="M3 12a9 9 0 1 0 3-6.7" />
+    <path d="M3 4v5h5" />
+  </svg>
+);
+
 function initial(name: string) {
   return name.trim().charAt(0).toUpperCase() || "?";
 }
@@ -212,6 +229,17 @@ function PeopleList() {
     [editor],
   );
 
+  // Счётчик «вернуть отставших»: учитель увеличивает его на 1, и у учеников,
+  // которые оторвались от показа, слежение включается заново.
+  const presenterPing = useValue(
+    "presenterPing",
+    () => {
+      const v = editor.getDocumentSettings().meta?.presenterPing;
+      return typeof v === "number" ? v : 0;
+    },
+    [editor],
+  );
+
   const role = ctx?.me.role;
   // Учитель среди участников, как его видит этот клиент
   const presenter = presenterName
@@ -227,13 +255,12 @@ function PeopleList() {
     if (!role || role === "owner") return;
     const current = editor.getInstanceState().followingUserId;
     if (presenterUserId) {
-      if (current !== presenterUserId)
-        editor.startFollowingUser(presenterUserId);
+      if (current !== presenterUserId) editor.startFollowingUser(presenterUserId);
     } else if (prevPresenter.current && current === prevPresenter.current) {
       editor.stopFollowingUser();
     }
     prevPresenter.current = presenterUserId;
-  }, [editor, role, presenterUserId]);
+  }, [editor, role, presenterUserId, presenterPing]); // presenterPing: сигнал «вернуть отставших»
 
   if (!ctx) return null;
 
@@ -252,6 +279,12 @@ function PeopleList() {
         presenterName: iAmPresenting ? null : me.name,
       },
     });
+  }
+
+  function bringBack() {
+    const meta = editor.getDocumentSettings().meta;
+    const current = typeof meta?.presenterPing === "number" ? meta.presenterPing : 0;
+    editor.updateDocumentSettings({ meta: { ...meta, presenterPing: current + 1 } });
   }
 
   function setFolded(value: boolean) {
@@ -277,7 +310,6 @@ function PeopleList() {
   const people = [...new Map(collaborators.map((c) => [c.userId, c])).values()];
 
   // Диагностика: включается, если к адресу страницы добавить ?debug
-  /*
   const debug = new URLSearchParams(window.location.search).has("debug");
   const debugText = JSON.stringify(
     {
@@ -294,7 +326,22 @@ function PeopleList() {
     null,
     1,
   );
-  */
+
+  // Кто из участников сейчас смотрит на экран учителя.
+  // Каждый участник сообщает остальным, за кем он следит (followingUserId).
+  // Учитель в своём списке себя не видит, поэтому его id для остальных берём из
+  // me.userKey (сервер выдаёт id участников в виде "user:<userKey>").
+  // Если userKey нет, считаем так: следит за тем, кого нет в списке, значит за учителем.
+  const myUserKey = (me as unknown as { userKey?: string }).userKey;
+  const knownIds = new Set(people.map((c) => c.userId));
+  const followsMe = (c: (typeof people)[number]) =>
+    c.followingUserId != null &&
+    (myUserKey
+      ? c.followingUserId === `user:${myUserKey}`
+      : !knownIds.has(c.followingUserId));
+  const followers = people.filter(followsMe).length;
+  const lagging = people.length - followers;
+
   // Круг пульсирует, если вы показываете доску или следите за кем-то
   const live = iAmPresenting || followingId !== null;
 
@@ -370,7 +417,24 @@ function PeopleList() {
               }
             >
               <BroadcastIcon />
-              {iAmPresenting ? "Показ идёт" : "Все смотрят на меня"}
+              {iAmPresenting
+                ? people.length > 0
+                  ? `Показ идёт: ${followers} из ${people.length}`
+                  : "Показ идёт"
+                : "Все смотрят на меня"}
+            </button>
+          </div>
+        )}
+
+        {iAmPresenting && lagging > 0 && (
+          <div className="sp-actions">
+            <button
+              className="sp-btn sp-back"
+              onClick={bringBack}
+              title="Снова подключить к вашему экрану тех, кто отстал"
+            >
+              <RewindIcon />
+              Вернуть отставших ({lagging})
             </button>
           </div>
         )}
@@ -380,9 +444,7 @@ function PeopleList() {
         )}
 
         <div className="sp-list">
-          {people.length === 0 && (
-            <p className="sp-empty">Пока вы здесь одни</p>
-          )}
+          {people.length === 0 && <p className="sp-empty">Пока вы здесь одни</p>}
 
           {people.map((c) => {
             const following = followingId === c.userId;
@@ -400,6 +462,19 @@ function PeopleList() {
                 >
                   <span className="sp-avatar">{initial(name)}</span>
                   <span className="sp-person-name">{name}</span>
+                  {iAmPresenting &&
+                    (followsMe(c) ? (
+                      <span className="sp-tag" title="Смотрит на ваш экран">
+                        <CheckIcon />
+                      </span>
+                    ) : (
+                      <span
+                        className="sp-tag sp-lag"
+                        title="Не следит за вашим экраном"
+                      >
+                        отстал
+                      </span>
+                    ))}
                 </button>
                 <button
                   className="sp-follow"
@@ -418,7 +493,7 @@ function PeopleList() {
           })}
         </div>
 
-        {/* {debug && <pre className="sp-debug">{debugText}</pre>} */}
+        {debug && <pre className="sp-debug">{debugText}</pre>}
       </div>
     </div>
   );
