@@ -37,12 +37,20 @@ const COLLAPSE_KEY = "schoolboard-card-collapsed";
 // Стили лежат здесь же, классы начинаются с sp-, чтобы не пересекаться с tldraw.
 // Цвета берём из переменных tldraw, поэтому светлая и тёмная тема работают сами.
 const css = `
+/* Фон и цвет текста берём из переменных tldraw, но с запасным значением:
+   если переменной с таким именем в этой версии tldraw нет, фон всё равно будет сплошным. */
 .sp-card {
+  --sp-panel: var(--tl-color-panel, var(--color-panel, #ffffff));
+  --sp-text: var(--tl-color-text, var(--color-text, #1f2a37));
   pointer-events: all; box-sizing: border-box; max-width: 240px; min-width: 200px;
   padding: 10px; border-radius: 14px;
-  background: var(--color-panel); color: var(--color-text);
+  background: var(--sp-panel); color: var(--sp-text);
   box-shadow: 0 6px 22px rgba(15, 23, 42, .18), 0 0 0 1px rgba(128, 128, 128, .18);
   font: 13px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.tl-theme__dark .sp-card {
+  --sp-panel: var(--tl-color-panel, var(--color-panel, #212529));
+  --sp-text: var(--tl-color-text, var(--color-text, #f0f1f3));
 }
 .sp-me { display: flex; align-items: center; gap: 9px; }
 .sp-avatar {
@@ -61,14 +69,14 @@ const css = `
   display: grid; place-items: center; cursor: pointer; background: none;
   color: var(--color-text-3, #868e96);
 }
-.sp-fold:hover { background: var(--color-muted-2, rgba(128, 128, 128, .14)); color: var(--color-text); }
+.sp-fold:hover { background: var(--color-muted-2, rgba(128, 128, 128, .14)); color: var(--sp-text); }
 
 .sp-actions { display: flex; gap: 6px; margin-top: 10px; }
 .sp-actions + .sp-actions { margin-top: 6px; }
 .sp-btn {
   flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   height: 30px; padding: 0 10px; border: 0; border-radius: 9px; cursor: pointer;
-  font: inherit; font-weight: 600; color: var(--color-text);
+  font: inherit; font-weight: 600; color: var(--sp-text);
   background: var(--color-muted-2, rgba(128, 128, 128, .14));
   transition: background-color .15s ease, color .15s ease;
 }
@@ -103,7 +111,7 @@ const css = `
   display: grid; place-items: center; background: none; color: var(--color-text-3, #868e96);
   transition: background-color .15s ease, color .15s ease;
 }
-.sp-follow:hover { background: var(--color-muted-2, rgba(128, 128, 128, .14)); color: var(--color-text); }
+.sp-follow:hover { background: var(--color-muted-2, rgba(128, 128, 128, .14)); color: var(--sp-text); }
 .sp-follow[aria-pressed="true"] { background: var(--c); color: #fff; animation: sp-pulse 1.8s ease-out infinite; }
 
 /* Свёрнутая карточка: круг с аватаркой */
@@ -111,7 +119,7 @@ const css = `
   pointer-events: all; position: relative; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%;
   display: grid; place-items: center; cursor: pointer; background: var(--c); color: #fff;
   font: 700 15px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  box-shadow: 0 6px 22px rgba(15, 23, 42, .22), 0 0 0 2px var(--color-panel);
+  box-shadow: 0 6px 22px rgba(15, 23, 42, .22), 0 0 0 2px var(--sp-panel, #fff);
 }
 .sp-circle[data-live="true"] { animation: sp-pulse 1.8s ease-out infinite; }
 
@@ -191,11 +199,13 @@ function initial(name: string) {
   return name.trim().charAt(0).toUpperCase() || "?";
 }
 
+// Пока человек сам не выбрал, карточка свёрнута в круг: на телефоне она занимает много места.
+// Если он развернул её, выбор запоминается ("0"), и дальше она открывается развёрнутой.
 function readCollapsed() {
   try {
-    return localStorage.getItem(COLLAPSE_KEY) === "1";
+    return localStorage.getItem(COLLAPSE_KEY) !== "0";
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -309,24 +319,6 @@ function PeopleList() {
   // Один человек в нескольких вкладках показывается один раз
   const people = [...new Map(collaborators.map((c) => [c.userId, c])).values()];
 
-  // Диагностика: включается, если к адресу страницы добавить ?debug
-  const debug = new URLSearchParams(window.location.search).has("debug");
-  const debugText = JSON.stringify(
-    {
-      role: me.role,
-      presenterName,
-      presenterUserId,
-      followingId,
-      collaborators: collaborators.map((c) => ({
-        id: c.userId,
-        name: c.userName,
-        following: c.followingUserId,
-      })),
-    },
-    null,
-    1,
-  );
-
   // Кто из участников сейчас смотрит на экран учителя.
   // Каждый участник сообщает остальным, за кем он следит (followingUserId).
   // Учитель в своём списке себя не видит, поэтому его id для остальных берём из
@@ -341,6 +333,29 @@ function PeopleList() {
       : !knownIds.has(c.followingUserId));
   const followers = people.filter(followsMe).length;
   const lagging = people.length - followers;
+
+  // Диагностика: включается, если к адресу страницы добавить ?debug
+  const debug = new URLSearchParams(window.location.search).has("debug");
+  const debugText = JSON.stringify(
+    {
+      role: me.role,
+      presenterName,
+      presenterUserId,
+      presenterPing,
+      followingId,
+      myUserKey,
+      followers,
+      lagging,
+      collaborators: collaborators.map((c) => ({
+        id: c.userId,
+        name: c.userName,
+        following: c.followingUserId,
+        followsMe: followsMe(c),
+      })),
+    },
+    null,
+    1,
+  );
 
   // Круг пульсирует, если вы показываете доску или следите за кем-то
   const live = iAmPresenting || followingId !== null;

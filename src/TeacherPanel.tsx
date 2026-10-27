@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 
 type Participant = {
   id: string;
@@ -34,7 +34,7 @@ const css = `
 }
 .tp-dot {
   position: absolute; right: -2px; bottom: -2px; width: 11px; height: 11px;
-  border-radius: 50%; background: #adb5bd; box-shadow: 0 0 0 2px #fff;
+  border-radius: 50%; background: #adb5bd; box-shadow: 0 0 0 2px var(--tp-panel, #fff);
 }
 .tp-row[data-online="true"] .tp-dot { background: #2f9e44; }
 
@@ -61,11 +61,55 @@ const css = `
 }
 .tp-del:hover { background: #ffe3e3; color: #c92a2a; }
 
+.tp-panel.tp-dark {
+  background: #2c3036; color: #f8f9fa;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255, 255, 255, .09);
+}
+.tp-dark .tp-count, .tp-dark .tp-empty { color: #9aa4b2; }
+.tp-dark .tp-error { color: #ff8787; }
+.tp-dark .tp-row { border-top-color: #3d444c; }
+.tp-dark .tp-dot { box-shadow: 0 0 0 2px var(--tp-panel, #2c3036); }
+.tp-dark .tp-seg { background: #3d444c; }
+.tp-dark .tp-thumb { background: #64748b; }
+.tp-dark .tp-seg[data-role="editor"] .tp-thumb { background: #f08c00; }
+.tp-dark .tp-seg button { color: #9aa4b2; }
+.tp-dark .tp-seg button[aria-pressed="true"] { color: #fff; }
+.tp-dark .tp-seg button:not([aria-pressed="true"]):hover { color: #f8f9fa; }
+.tp-dark .tp-del { color: #868e96; }
+.tp-dark .tp-del:hover { background: rgba(224, 49, 49, .22); color: #ff8787; }
 .tp-panel button:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) {
   .tp-thumb, .tp-seg button { transition: none; }
 }
 `;
+
+// Панель стоит вне tldraw и не получает его тему сама, поэтому смотрим на класс контейнера доски:
+// tldraw ставит на него tl-theme__dark в тёмной теме и tl-theme__light в светлой.
+function useTldrawTheme() {
+  const read = () => {
+    const el = document.querySelector(".tl-container");
+    const cs = el ? getComputedStyle(el) : null;
+    // Переменная называется по-разному в разных версиях tldraw, пробуем оба имени
+    const pick = (names: string[]) =>
+      names.map((n) => cs?.getPropertyValue(n).trim()).find(Boolean) || undefined;
+    return {
+      dark: !!document.querySelector(".tl-theme__dark"),
+      panel: pick(["--tl-color-panel", "--color-panel"]),
+      text: pick(["--tl-color-text", "--color-text"]),
+    };
+  };
+  const [theme, setTheme] = useState(read);
+
+  useEffect(() => {
+    const target = document.querySelector(".tl-container") ?? document.body;
+    const observer = new MutationObserver(() => setTheme(read()));
+    observer.observe(target, { attributes: true, attributeFilter: ["class"] });
+    setTheme(read());
+    return () => observer.disconnect();
+  }, []);
+
+  return theme;
+}
 
 // Цвет аватарки зависит от имени: у одного человека он всегда одинаковый
 function avatarColor(name: string) {
@@ -116,6 +160,7 @@ export default function TeacherPanel({
   const ref = useRef<HTMLDivElement>(null);
   const [list, setList] = useState<Participant[]>([]);
   const [error, setError] = useState("");
+  const theme = useTldrawTheme();
 
   const load = useCallback(async () => {
     try {
@@ -177,7 +222,18 @@ export default function TeacherPanel({
   const onlineCount = list.filter((p) => p.online).length;
 
   return (
-    <div ref={ref} className="tp-panel">
+    <div
+      ref={ref}
+      className={theme.dark ? "tp-panel tp-dark" : "tp-panel"}
+      style={
+        {
+          // Цвет панели берём у самого tldraw, чтобы она совпадала с карточкой пользователя
+          "--tp-panel": theme.panel,
+          background: theme.panel,
+          color: theme.text,
+        } as CSSProperties
+      }
+    >
       <style>{css}</style>
 
       <div className="tp-head">
